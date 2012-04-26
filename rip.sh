@@ -14,8 +14,8 @@ for form in 201-a 386-attack 412-plant 413-plant 421-overcast 422-west \
             423-west 487-altered 492-land
 do
     id=$(echo $form | sed 's/-.*//')  # dash has no <<<
-    for file in $(find $2 -name $form.ppm)
+    for file in $(find $2 -name $form.png)
     do
-        cp $file $(dirname $file)/$id.ppm
+        cp $file $(dirname $file)/$id.png
     done
 done
