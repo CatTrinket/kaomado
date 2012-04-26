@@ -12,6 +12,7 @@ Pokémon in the portrait.  This also means that the "right" sprite is the one
 that appears on the right side of the screen in-game.
 """
 
+import errno.EEXIST
 import os
 import png
 from struct import unpack
@@ -19,13 +20,14 @@ from sys import argv
 
 from tables import expressions, pokemon_ids, Pokemon
 
-def build_filename(pokemon, sprite_num):
+def build_filename(pokemon, sprite_num, output_dir):
     """Determine an output filename for a sprite given the Pokémon it
-    depicts and its index in that Pokémon's list of sprite pointers.
+    depicts, the sprite's index in that Pokémon's list of sprite pointers,
+    and the base output directory.
     """
 
     # Start with the main output directory
-    filename = [argv[2]]
+    filename = [output_dir]
 
     # Stick various junk sprites in other/ for potential debug purposes
     if pokemon.species == 'other':
@@ -57,7 +59,7 @@ def decompress(kaomado):
     if kaomado.read(5) != b'AT4PX':
         raise ValueError('wrong magic bytes')
 
-    kaomado.seek(2, 1)  # Skip the compressed length since we don't use it
+    kaomado.seek(2, os.SEEK_CUR)  # Compressed length; we don't use this
 
     # The control codes used for 0-flags vary from sprite to sprite
     controls = list(kaomado.read(9))
@@ -123,7 +125,7 @@ def makedirs_if_need_be(filename):
     try:
         os.makedirs(os.path.dirname(filename))
     except OSError as e:
-        if e.errno == 17:
+        if e.errno == errno.EEXIST:
             # Leaf directory already exists
             pass
         else:
@@ -145,16 +147,21 @@ def parse_palette(kaomado):
 
     return palette
 
+def pixel_iterator(sprite):
+    """Iterate over raw sprite data pixel by pixel."""
+
+    for pixel_pair in sprite:
+        yield pixel_pair & 0xf
+        yield pixel_pair >> 4
+
 def unscramble(sprite, palette):
     """Unscramble the raw sprite data into something pypng can swallow."""
 
-    # Step 1: unpack each byte into its two pixels
-    pixels = []
-    for pixel_pair in sprite:
-        pixels.extend((pixel_pair & 0xf, pixel_pair >> 4))
+    pixels = pixel_iterator(sprite)
 
-    # Step 2: untile & Step 3: replace palette indices with RGB channels
-    # (At the time of writing, pypng's image[y][x][channel] thing doesn't work)
+    # Untile the sprite and apply the palette.  Each row is a flat list of RGB
+    # channels because, at the time of writing, image[y][x][channel] doesn't
+    # actually work with png.from_array().
     image = [[None for x_channel in range(120)] for y in range(40)]
 
     for tile in range(25):
@@ -168,7 +175,7 @@ def unscramble(sprite, palette):
             x = (tile_x * 8 + pixel_x) * 3
             y = tile_y * 8 + pixel_y
 
-            image[y][x:x + 3] = palette[pixels.pop(0)]
+            image[y][x:x + 3] = next(pixels)
 
     return image
 
@@ -178,6 +185,7 @@ if len(argv) != 3:
     exit(1)
 
 kaomado = open(argv[1], 'br')
+output_dir = argv[2]
 
 for pokemon in range(1, 1155):
     kaomado.seek(0xa0 * pokemon)
@@ -188,7 +196,7 @@ for pokemon in range(1, 1155):
         pokemon = Pokemon(pokemon, 'other', None, False)
 
     # Each Pokémon has a sprite pointer for each facial expression and
-    # direction, if they're not all used
+    # direction, even if they're not all used
     pointers = unpack('<40L', kaomado.read(0xa0))
 
     for sprite_num, pointer in enumerate(pointers):
@@ -207,6 +215,6 @@ for pokemon in range(1, 1155):
 
         # Save it as a PNG
         sprite = png.from_array(sprite, mode='RGB;5')
-        filename = build_filename(pokemon, sprite_num)
+        filename = build_filename(pokemon, sprite_num, output_dir)
         makedirs_if_need_be(filename)
         sprite.save(filename)
