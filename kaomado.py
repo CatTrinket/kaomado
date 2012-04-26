@@ -12,7 +12,7 @@ Pokémon in the portrait.  This also means that the "right" sprite is the one
 that appears on the right side of the screen in-game.
 """
 
-import errno.EEXIST
+import errno
 import os
 import png
 from struct import unpack
@@ -175,7 +175,7 @@ def unscramble(sprite, palette):
             x = (tile_x * 8 + pixel_x) * 3
             y = tile_y * 8 + pixel_y
 
-            image[y][x:x + 3] = next(pixels)
+            image[y][x:x + 3] = palette[next(pixels)]
 
     return image
 
