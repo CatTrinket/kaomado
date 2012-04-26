@@ -1,3 +1,13 @@
+#!/usr/bin/env python3
+"""Extract the portrait sprites from Pokémon Mystery Dungeon: Explorers of Sky.
+
+This program does not actually rip sprites directly from a ROM.  You'll have to
+provide the portrait file yourself.  In a PMD: Sky ROM (or at least a European
+multilingual one) the file can be found at /FONT/kaomado.kao.
+
+"kaomado" means "face window", as far as I can tell.
+"""
+
 import os
 from struct import unpack
 
