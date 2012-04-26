@@ -10,10 +10,15 @@ multilingual one) the file can be found at /FONT/kaomado.kao.
 
 import os
 from struct import unpack
+from sys import argv
 
 from tables import expressions, pokemon_ids, Pokemon
 
-kaomado = open('/var/tmp/kaomado.kao', 'br')
+if len(argv) != 3:
+    print("Usage: kaomado.py /path/to/kaomado.kao output-dir")
+    exit(1)
+
+kaomado = open(argv[1], 'br')
 
 for pokemon in range(1155):
     kaomado.seek(0xa0 * pokemon)
@@ -76,7 +81,7 @@ for pokemon in range(1155):
                        for b in range(high + 3):
                            sprite.append(sprite[offset])
 
-        filename = ['/var/tmp/kaomado']
+        filename = [argv[2]]
 
         if pokemon.species == 'other':
             filename.append('other')
