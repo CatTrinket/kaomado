@@ -3,10 +3,6 @@ from struct import unpack
 
 from tables import expressions, pokemon_ids, Pokemon
 
-emotions = ['', 'grin', 'pained', 'angry', 'worried', 'sad', 'crying',
-            'shouting', 'teary-eyed', 'determined', 'joyous', 'inspired',
-            'surprised', 'dizzy', 'sweatdrop1', 'sweatdrop2']
-
 kaomado = open('/var/tmp/kaomado.kao', 'br')
 
 for pokemon in range(1155):
