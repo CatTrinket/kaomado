@@ -1,34 +1,10 @@
 from collections import namedtuple
 
-expressions = [
-    'standard',
-    'grin',
-    'pained',
-    'angry',
-    'worried',
-    'sad',
-    'crying',
-    'shouting',
-    'teary-eyed',
-    'determined',
-    'joyous',
-    'inspired',
-    'surprised',
-    'dizzy',
-    'sigh',  # Shaymin only
-    None,
-    'sigh',
-    'sweatdrop',
-    'misc',
-    None
-]
-
-
 # female is true iff the sprite is a SEPARATE female sprite
 # e.g. True for female Rattata, false for Latias
 Pokemon = namedtuple('Pokemon', 'national_id species form female')
 
-sky_pokemon = {
+sky = {
     1: Pokemon(1, 'bulbasaur', None, False),
     2: Pokemon(2, 'ivysaur', None, False),
     3: Pokemon(3, 'venusaur', None, False),
@@ -646,14 +622,14 @@ def _sky_to_blue_iterator():
         if sky_id in skip:
             skipped += 1
         else:
-            yield (sky_id - skipped, sky_pokemon[sky_id])
+            yield (sky_id - skipped, sky[sky_id])
 
     # Final oddities; I might have the Unowns and Deoxyses in the wrong order
-    yield (415, sky_pokemon[227])  # Unown !
-    yield (416, sky_pokemon[228])  # Unown ?
-    yield (417, sky_pokemon[419])  # Attack Deoxys
-    yield (418, sky_pokemon[420])  # Defense Deoxys
-    yield (419, sky_pokemon[421])  # Speed Deoxys
-    yield (420, sky_pokemon[488])  # Munchlax
+    yield (415, sky[227])  # Unown !
+    yield (416, sky[228])  # Unown ?
+    yield (417, sky[419])  # Attack Deoxys
+    yield (418, sky[420])  # Defense Deoxys
+    yield (419, sky[421])  # Speed Deoxys
+    yield (420, sky[488])  # Munchlax
 
-blue_pokemon = dict(_sky_to_blue_iterator())
+blue = dict(_sky_to_blue_iterator())

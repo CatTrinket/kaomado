@@ -47,14 +47,14 @@ def build_filename(pokemon, sprite_num, output_dir):
     if pokemon.female:
         filename.append('female')
 
+    # XXX Expressions are only correct for protagonist/partner Pokémon
     if VERSION == 'sky':
         # Sprite pointers come in pairs of two: facing left and (sometimes)
         # right for a given facial expression.
-        expression = tables.expressions[sprite_num // 2]
+        expression = tables.expressions.sky[sprite_num // 2]
         right = sprite_num % 2 == 1
     elif VERSION == 'blue':
-        # XXX This is only mostly correct, and only for the playable Pokémon
-        expression = tables.expressions[sprite_num]
+        expression = tables.expressions.blue[sprite_num]
         right = False
 
     if expression != 'standard':
@@ -185,7 +185,7 @@ def rip_blue(kaomado, output_dir):
 
         label = kaomado.read(8).rstrip(b'\x00').decode('ASCII')
         pokemon = int(label[3:])
-        pokemon = tables.blue_pokemon[pokemon]
+        pokemon = tables.pokemon.blue[pokemon]
 
         pointer, length = unpack('<2L', kaomado.read(8))
         end = pointer + length
@@ -228,9 +228,9 @@ def rip_sky(kaomado, output_dir):
         kaomado.seek(0xa0 * pokemon)
 
         try:
-            pokemon = tables.sky_pokemon[pokemon]
+            pokemon = tables.pokemon.sky[pokemon]
         except KeyError:
-            pokemon = tables.Pokemon(pokemon, 'other', None, False)
+            pokemon = tables.pokemon.Pokemon(pokemon, 'other', None, False)
 
         # Each Pokémon has a sprite pointer for each facial expression and
         # direction, even if they're not all used
