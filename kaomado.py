@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """Extract the portrait sprites from Pokémon Mystery Dungeon: Explorers of Sky.
+PMD: Blue Rescue Team is also partially supported.
 
 Requires pypng 0.0.13 or later.
 
 This program does not actually rip sprites directly from a ROM.  You'll have to
-provide the portrait file yourself.  In a PMD: Sky ROM (or at least a European
-multilingual one) the file can be found at /FONT/kaomado.kao.
+provide the portrait file yourself.  In a European PMD: Sky ROM, the file is
+located at /FONT/kaomado.kao; in an American PMD: Blue ROM, the file this
+script requires is /monster.sbin.  I assume these files are the same for other
+regions.
+
+/monster.sbin contains at least the portraits for Pokémon with multiple
+portraits.  They only take up part of the file, so the others might be in the
+same file, but if so, they don't use the same compression scheme.
 
 "kaomado" means "face window", as far as I can tell.
 
@@ -20,7 +27,9 @@ import png
 from struct import unpack
 from sys import argv
 
-from tables import expressions, pokemon_ids, Pokemon
+import tables
+
+VERSION = None
 
 def build_filename(pokemon, sprite_num, output_dir):
     """Determine an output filename for a sprite given the Pokémon it
@@ -38,13 +47,20 @@ def build_filename(pokemon, sprite_num, output_dir):
     if pokemon.female:
         filename.append('female')
 
-    # Sprite pointers come in pairs of two: facing left and (sometimes) right
-    # for a given facial expression.
-    expression = expressions[sprite_num // 2]
+    if VERSION == 'sky':
+        # Sprite pointers come in pairs of two: facing left and (sometimes)
+        # right for a given facial expression.
+        expression = tables.expressions[sprite_num // 2]
+        right = sprite_num % 2 == 1
+    elif VERSION == 'blue':
+        # XXX This is only mostly correct, and only for the playable Pokémon
+        expression = tables.expressions[sprite_num]
+        right = False
+
     if expression != 'standard':
         filename.append(expression)
 
-    if sprite_num % 2 != 0:
+    if right:
         filename.append('right')
 
     # Figure out the base filename
@@ -139,6 +155,9 @@ def parse_palette(kaomado):
 
     Each channel gets its own byte, for some reason, as opposed to the usual
     NTFP color format which actually fits all three into fifteen bits.
+
+    In PMD: Blue, each palette entry is padded to four bytes with 0x80 and I
+    don't know why.
     """
 
     palette = []
@@ -146,6 +165,9 @@ def parse_palette(kaomado):
         palette.append(tuple(
             channel >> 3 for channel in kaomado.read(3)
         ))
+
+        if VERSION == 'blue':
+            kaomado.seek(1, os.SEEK_CUR)
 
     return palette
 
@@ -155,6 +177,84 @@ def pixel_iterator(sprite):
     for pixel_pair in sprite:
         yield pixel_pair & 0xf
         yield pixel_pair >> 4
+
+def rip_blue(kaomado, output_dir):
+    for pokemon in range(0x1a70, 0x1ef0, 0x10):
+        # Deliberately skipping the last one because it's a dupe Rayquaza
+        kaomado.seek(pokemon)
+
+        label = kaomado.read(8).rstrip(b'\x00').decode('ASCII')
+        pokemon = int(label[3:])
+        pokemon = tables.blue_pokemon[pokemon]
+
+        pointer, length = unpack('<2L', kaomado.read(8))
+        end = pointer + length
+
+        kaomado.seek(pointer)
+        assert kaomado.read(4) == b'SIR0'
+        sprites_length, = unpack('<L', kaomado.read(4))
+        sprites_end = pointer + sprites_length
+        kaomado.seek(8, os.SEEK_CUR)
+
+        sprite_num = 0
+        while kaomado.tell() < sprites_end:
+            palette = parse_palette(kaomado)
+
+            try:
+                sprite = decompress(kaomado)
+            except ValueError:
+                print(hex(kaomado.tell()), hex(end), end - kaomado.tell())
+                break
+
+            # Each compressed sprite is padded to a multiple of four bytes
+            four_offset = kaomado.tell() % 4
+            if four_offset:
+                kaomado.seek(4 - four_offset, os.SEEK_CUR)
+
+            sprite = unscramble(sprite, palette)
+            sprite = png.from_array(sprite, mode='RGB;5')
+
+            filename = build_filename(pokemon, sprite_num, output_dir)
+            makedirs_if_need_be(filename)
+            sprite.save(filename)
+
+            sprite_num += 1
+
+        print(kaomado.read(end - sprites_end))
+
+
+def rip_sky(kaomado, output_dir):
+    for pokemon in range(1, 1155):
+        kaomado.seek(0xa0 * pokemon)
+
+        try:
+            pokemon = tables.sky_pokemon[pokemon]
+        except KeyError:
+            pokemon = tables.Pokemon(pokemon, 'other', None, False)
+
+        # Each Pokémon has a sprite pointer for each facial expression and
+        # direction, even if they're not all used
+        pointers = unpack('<40L', kaomado.read(0xa0))
+
+        for sprite_num, pointer in enumerate(pointers):
+            if not 0x2d1e0 <= pointer <= 0x1968c0:
+                # Nonexistent sprites have consistent junk pointers, thankfully
+                continue
+
+            kaomado.seek(pointer)
+
+            # Get the palette
+            palette = parse_palette(kaomado)
+
+            # Extract the actual sprite
+            sprite = decompress(kaomado)
+            sprite = unscramble(sprite, palette)
+
+            # Save it as a PNG
+            sprite = png.from_array(sprite, mode='RGB;5')
+            filename = build_filename(pokemon, sprite_num, output_dir)
+            makedirs_if_need_be(filename)
+            sprite.save(filename)
 
 def unscramble(sprite, palette):
     """Unscramble the raw sprite data into something pypng can swallow."""
@@ -183,40 +283,19 @@ def unscramble(sprite, palette):
 
 
 if len(argv) != 3:
-    print("Usage: kaomado.py /path/to/kaomado.kao output-dir")
+    print("Usage: kaomado.py portrait-file output-dir")
     exit(1)
 
-kaomado = open(argv[1], 'br')
+kaomado = open(argv[1], 'rb')
 output_dir = argv[2]
 
-for pokemon in range(1, 1155):
-    kaomado.seek(0xa0 * pokemon)
+magic = kaomado.read(5)
 
-    try:
-        pokemon = pokemon_ids[pokemon]
-    except KeyError:
-        pokemon = Pokemon(pokemon, 'other', None, False)
+if magic == b'\x00\x00\x00\x00\x00':
+    VERSION = 'sky'
+    rip = rip_sky
+elif magic == b'ax001':
+    VERSION = 'blue'
+    rip = rip_blue
 
-    # Each Pokémon has a sprite pointer for each facial expression and
-    # direction, even if they're not all used
-    pointers = unpack('<40L', kaomado.read(0xa0))
-
-    for sprite_num, pointer in enumerate(pointers):
-        if not 0x2d1e0 <= pointer <= 0x1968c0:
-            # Nonexistent sprites have consistent junk pointers, thankfully
-            continue
-
-        kaomado.seek(pointer)
-
-        # Get the palette
-        palette = parse_palette(kaomado)
-
-        # Extract the actual sprite
-        sprite = decompress(kaomado)
-        sprite = unscramble(sprite, palette)
-
-        # Save it as a PNG
-        sprite = png.from_array(sprite, mode='RGB;5')
-        filename = build_filename(pokemon, sprite_num, output_dir)
-        makedirs_if_need_be(filename)
-        sprite.save(filename)
+rip(kaomado, output_dir)

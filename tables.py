@@ -28,7 +28,7 @@ expressions = [
 # e.g. True for female Rattata, false for Latias
 Pokemon = namedtuple('Pokemon', 'national_id species form female')
 
-pokemon_ids = {
+sky_pokemon = {
     1: Pokemon(1, 'bulbasaur', None, False),
     2: Pokemon(2, 'ivysaur', None, False),
     3: Pokemon(3, 'venusaur', None, False),
@@ -628,3 +628,32 @@ pokemon_ids = {
     1106: Pokemon(464, 'rhyperior', None, True),
     1115: Pokemon(473, 'mamoswine', None, True)
 }
+
+def _sky_to_blue_iterator():
+    """Yield tuples for a dict of Blue Rescue Team Pokémon IDs based on the Sky
+    Pokémon ID dict.
+
+    This information is based on a list of Pokémon names I found in Blue's
+    /system.sbin at 0x5f070.  It holds for all the sprites we need, at least.
+    """
+
+    # Skip: Unown !, Unown ?, shiny Celebi, purple Kecleon
+    skip = [227, 228, 279, 384]
+    skipped = 0
+
+    # Everything up to Normal Deoxys is the same aside from the skips
+    for sky_id in range(1, 419):
+        if sky_id in skip:
+            skipped += 1
+        else:
+            yield (sky_id - skipped, sky_pokemon[sky_id])
+
+    # Final oddities; I might have the Unowns and Deoxyses in the wrong order
+    yield (415, sky_pokemon[227])  # Unown !
+    yield (416, sky_pokemon[228])  # Unown ?
+    yield (417, sky_pokemon[419])  # Attack Deoxys
+    yield (418, sky_pokemon[420])  # Defense Deoxys
+    yield (419, sky_pokemon[421])  # Speed Deoxys
+    yield (420, sky_pokemon[488])  # Munchlax
+
+blue_pokemon = dict(_sky_to_blue_iterator())
