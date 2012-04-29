@@ -40,27 +40,24 @@ def build_filename(pokemon, sprite_num, output_dir):
     # Start with the main output directory
     filename = [output_dir]
 
-    # Stick various junk sprites in other/ for potential debug purposes
+    # Stick various junk sprites in junk/ for potential debug purposes
     if pokemon.species == 'other':
-        filename.append('other')
+        filename.append('junk')
 
     if pokemon.female:
         filename.append('female')
 
-    # XXX Expressions are only correct for protagonist/partner Pokémon
     if VERSION == 'sky':
-        # Sprite pointers come in pairs of two: facing left and (sometimes)
-        # right for a given facial expression.
-        expression = tables.expressions.sky[sprite_num // 2]
-        right = sprite_num % 2 == 1
+        get_expression = tables.expressions.sky
     elif VERSION == 'blue':
-        expression = tables.expressions.blue[sprite_num]
-        right = False
+        get_expression = tables.expressions.blue
+
+    expression, is_right = get_expression(pokemon, sprite_num)
 
     if expression != 'standard':
         filename.append(expression)
 
-    if right:
+    if is_right:
         filename.append('right')
 
     # Figure out the base filename
