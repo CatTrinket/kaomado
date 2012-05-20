@@ -240,10 +240,13 @@ _blue_special_cases = {
     ('275', 1): (SURPRISED, False),
     ('275', 2): (GRIN, False),
 
+    ('282', 2): (WORRIED, False),
+
     ('308', 2): (SURPRISED, False),
     ('308', 3): (OTHER_PROUD, False),
+    ('308', 4): (PAINED, False),
     ('308', 5): (ANGRY, False),
-    ('308', 6): (SAD, False),
+    ('308', 6): (WORRIED, False),
 
     ('327', 1): (SAD, False),
     ('327', 2): (STANDARD, True),
@@ -261,6 +264,7 @@ _blue_special_cases = {
     ('446', 2): (JOYOUS, False),
     ('446', 3): (GRIN, False),  # Matches Sky; looks more like Blue's HAPPY
     ('446', 4): (INSPIRED, False),  # Matches Sky; out of place for Blue
+    ('446', 5): (CRYING, False)
 }
 
 def sky(pokemon, sprite_num):
