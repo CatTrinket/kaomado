@@ -117,6 +117,7 @@ _sky_special_cases = {
 
     ('251', 16): OTHER_BLUSHING,
 
+    ('251-shiny', 6): OTHER_HURT,
     ('251-shiny', 16): OTHER_BLUSHING,
     ('251-shiny', 17): OTHER_TEARY_EYED_2,  # All nearly identical but distinct
     ('251-shiny', 18): OTHER_TEARY_EYED_3,  # (and with the wrong background)
@@ -155,6 +156,7 @@ _sky_special_cases = {
     ('428', 16): STUNNED,
 
     ('441', 16): TEARY_EYED,  # Background like grin et al
+    ('441', 17): SAD,
     ('441', 18): CRYING,
 
     ('442', 16): STUNNED,
