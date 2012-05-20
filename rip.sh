@@ -32,6 +32,8 @@ do
     fi
 done
 
+rmdir -p $temp_dir/right
+
 # Make duplicates for named default forms
 for form in 201-a 386-normal 412-plant 413-plant 421-overcast 422-west \
             423-west 487-altered 492-land
