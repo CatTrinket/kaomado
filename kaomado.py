@@ -292,7 +292,7 @@ else:
 
 # Make the leaves of the required directory tree (parents are taken care of)
 makedirs_if_need_be(os.path.join(output_dir, 'right'))
-if VERSION == 'blue':
+if VERSION == 'sky':
     makedirs_if_need_be(os.path.join(output_dir, 'female', 'right'))
 
 rip(kaomado, output_dir)
