@@ -278,10 +278,6 @@ if len(argv) != 3:
 kaomado = open(argv[1], 'rb')
 output_dir = argv[2]
 
-# Make the leaves of the required directory tree (parents are taken care of)
-makedirs_if_need_be(os.path.join(output_dir, 'right'))
-makedirs_if_need_be(os.path.join(output_dir, 'female', 'right'))
-
 magic = kaomado.read(5)
 
 if magic == b'\x00\x00\x00\x00\x00':
@@ -293,5 +289,10 @@ elif magic == b'ax001':
 else:
     print("Unrecognized portrait file")
     exit(1)
+
+# Make the leaves of the required directory tree (parents are taken care of)
+makedirs_if_need_be(os.path.join(output_dir, 'right'))
+if VERSION == 'blue':
+    makedirs_if_need_be(os.path.join(output_dir, 'female', 'right'))
 
 rip(kaomado, output_dir)
