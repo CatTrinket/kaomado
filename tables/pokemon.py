@@ -2,7 +2,18 @@ from collections import namedtuple
 
 # female is true iff the sprite is a SEPARATE female sprite
 # e.g. True for female Rattata, false for Latias
-Pokemon = namedtuple('Pokemon', 'national_id species form female')
+Pokemon = namedtuple('Pokemon', 'national_id species form is_female')
+
+class Pokemon(Pokemon):
+    @property
+    def identifier(self):
+        if not hasattr(self, '_identifier'):
+            if self.form is not None:
+                self._identifier = '{0}-{1}'.format(self.national_id, self.form)
+            else:
+                self._identifier = str(self.national_id)
+
+        return self._identifier
 
 sky = {
     1: Pokemon(1, 'bulbasaur', None, False),

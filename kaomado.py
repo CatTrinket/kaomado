@@ -31,40 +31,24 @@ import tables
 
 VERSION = None
 
-def build_filename(pokemon, sprite_num, output_dir):
+def build_filename(pokemon, expression, is_right, output_dir):
     """Determine an output filename for a sprite given the Pokémon it
-    depicts, the sprite's index in that Pokémon's list of sprite pointers,
-    and the base output directory.
+    depicts, an identifier for its facial expression, the direction it's
+    facing, and the base output directory.
     """
 
-    # Start with the main output directory
     filename = [output_dir]
 
-    # Stick various junk sprites in junk/ for potential debug purposes
-    if pokemon.species == 'other':
-        filename.append('junk')
-
-    if pokemon.female:
+    if pokemon.is_female:
         filename.append('female')
-
-    if VERSION == 'sky':
-        get_expression = tables.expressions.sky
-    elif VERSION == 'blue':
-        get_expression = tables.expressions.blue
-
-    expression, is_right = get_expression(pokemon, sprite_num)
-
-    if expression != 'standard':
-        filename.append(expression)
 
     if is_right:
         filename.append('right')
 
-    # Figure out the base filename
-    if pokemon.form is not None:
-        filename.append('{0}-{1}.png'.format(pokemon.national_id, pokemon.form))
+    if expression != tables.expressions.STANDARD:
+        filename.append('{0}-{1}.png'.format(pokemon.identifier, expression))
     else:
-        filename.append('{0}.png'.format(pokemon.national_id))
+        filename.append('{0}.png'.format(pokemon.identifier))
 
     return os.path.join(*filename)
 
@@ -72,7 +56,7 @@ def decompress(kaomado):
     """Decompress a sprite at the current offset."""
 
     if kaomado.read(5) != b'AT4PX':
-        raise ValueError('wrong magic bytes')
+        raise ValueError('wrong magic bytes for compressed sprite')
 
     kaomado.seek(2, os.SEEK_CUR)  # Compressed length; we don't use this
 
@@ -138,7 +122,7 @@ def makedirs_if_need_be(filename):
     """
 
     try:
-        os.makedirs(os.path.dirname(filename))
+        os.makedirs(filename)
     except OSError as e:
         if e.errno == errno.EEXIST:
             # Leaf directory already exists
@@ -176,58 +160,61 @@ def pixel_iterator(sprite):
         yield pixel_pair >> 4
 
 def rip_blue(kaomado, output_dir):
-    for pokemon in range(0x1a70, 0x1ef0, 0x10):
-        # Deliberately skipping the last one because it's a dupe Rayquaza
-        kaomado.seek(pokemon)
+    """Rip portrait sprites from Blue Rescue Team's monster.sbin.  Or at least
+    the important ones.
+    """
 
+    for pokemon_header in range(0x1a70, 0x1ef0, 0x10):
+        # Deliberately skipping the last one because it's a dupe Rayquaza
+        kaomado.seek(pokemon_header)
+
+        # Read the label, figure out which Pokémon it means
         label = kaomado.read(8).rstrip(b'\x00').decode('ASCII')
+        assert label.startswith('kao')
         pokemon = int(label[3:])
         pokemon = tables.pokemon.blue[pokemon]
 
+        # We only get one offset where all that Pokémon's portraits are packed
         pointer, length = unpack('<2L', kaomado.read(8))
-        end = pointer + length
-
         kaomado.seek(pointer)
+
+        # Find the portrait block, figure out where it ends
         assert kaomado.read(4) == b'SIR0'
         sprites_length, = unpack('<L', kaomado.read(4))
         sprites_end = pointer + sprites_length
-        kaomado.seek(8, os.SEEK_CUR)
+        kaomado.seek(8, os.SEEK_CUR)  # I don't know what this is
 
         sprite_num = 0
         while kaomado.tell() < sprites_end:
-            palette = parse_palette(kaomado)
+            expression, is_right = tables.expressions.blue(pokemon, sprite_num)
 
-            try:
-                sprite = decompress(kaomado)
-            except ValueError:
-                print(hex(kaomado.tell()), hex(end), end - kaomado.tell())
+            if expression is None:
+                # Only Skarmory has a placeholder; second and last in its block
                 break
 
-            # Each compressed sprite is padded to a multiple of four bytes
-            four_offset = kaomado.tell() % 4
-            if four_offset:
-                kaomado.seek(4 - four_offset, os.SEEK_CUR)
+            palette = parse_palette(kaomado)
+            sprite = decompress(kaomado)
 
+            # The start/end of each sprite is word-aligned
+            word_offset = kaomado.tell() % 4
+            if word_offset:
+                kaomado.seek(4 - word_offset, os.SEEK_CUR)
+
+            # Save image
             sprite = unscramble(sprite, palette)
             sprite = png.from_array(sprite, mode='RGB;5')
 
-            filename = build_filename(pokemon, sprite_num, output_dir)
-            makedirs_if_need_be(filename)
+            filename = build_filename(pokemon, expression, is_right, output_dir)
             sprite.save(filename)
 
             sprite_num += 1
 
-        print(kaomado.read(end - sprites_end))
-
 
 def rip_sky(kaomado, output_dir):
-    for pokemon in range(1, 1155):
-        kaomado.seek(0xa0 * pokemon)
+    """Rip portrait sprites from Explorers of Sky's kaomado.kao."""
 
-        try:
-            pokemon = tables.pokemon.sky[pokemon]
-        except KeyError:
-            pokemon = tables.pokemon.Pokemon(pokemon, 'other', None, False)
+    for internal_id, pokemon in tables.pokemon.sky.items():
+        kaomado.seek(0xa0 * internal_id)
 
         # Each Pokémon has a sprite pointer for each facial expression and
         # direction, even if they're not all used
@@ -236,6 +223,12 @@ def rip_sky(kaomado, output_dir):
         for sprite_num, pointer in enumerate(pointers):
             if not 0x2d1e0 <= pointer <= 0x1968c0:
                 # Nonexistent sprites have consistent junk pointers, thankfully
+                continue
+
+            expression, is_right = tables.expressions.sky(pokemon, sprite_num)
+
+            if expression is None:
+                # Some sprites exist, but are junk anyway
                 continue
 
             kaomado.seek(pointer)
@@ -249,8 +242,7 @@ def rip_sky(kaomado, output_dir):
 
             # Save it as a PNG
             sprite = png.from_array(sprite, mode='RGB;5')
-            filename = build_filename(pokemon, sprite_num, output_dir)
-            makedirs_if_need_be(filename)
+            filename = build_filename(pokemon, expression, is_right, output_dir)
             sprite.save(filename)
 
 def unscramble(sprite, palette):
@@ -286,6 +278,10 @@ if len(argv) != 3:
 kaomado = open(argv[1], 'rb')
 output_dir = argv[2]
 
+# Make the leaves of the required directory tree (parents are taken care of)
+makedirs_if_need_be(os.path.join(output_dir, 'right'))
+makedirs_if_need_be(os.path.join(output_dir, 'female', 'right'))
+
 magic = kaomado.read(5)
 
 if magic == b'\x00\x00\x00\x00\x00':
@@ -294,5 +290,8 @@ if magic == b'\x00\x00\x00\x00\x00':
 elif magic == b'ax001':
     VERSION = 'blue'
     rip = rip_blue
+else:
+    print("Unrecognized portrait file")
+    exit(1)
 
 rip(kaomado, output_dir)
