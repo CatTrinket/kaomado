@@ -116,13 +116,13 @@ def decompress(kaomado):
 
     return data
 
-def makedirs_if_need_be(filename):
-    """Create directories as needed to house the given filename, but don't
-    break if it turns out no directories actually need creating.
+def makedirs_if_need_be(leaf_directory):
+    """Create the given directory and its parents as needed, but don't break if
+    it turns out no directories actually need creating.
     """
 
     try:
-        os.makedirs(filename)
+        os.makedirs(leaf_directory)
     except OSError as e:
         if e.errno == errno.EEXIST:
             # Leaf directory already exists
