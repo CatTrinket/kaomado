@@ -14,28 +14,20 @@ output_dir=$3
 echo 'Ripping Sky...'
 $(dirname $0)/kaomado.py $kaomado $output_dir
 
-# Rip the Blue sprites to a temporary directory
+# Rip the Blue sprites to a subdirectory
 echo 'Ripping Blue...'
-temp_dir=$(mktemp -d)
-$(dirname $0)/kaomado.py $monster $temp_dir
+$(dirname $0)/kaomado.py $monster $output_dir/red-blue
 
 # Compare all the Blue sprites to their Sky equivalents; keep only the Blue
 # ones that differ
-echo 'Comparing and merging...'
-mkdir -p $output_dir/red-blue/right  # n.b. this is Gen III, so no female/
-
-for file in $(find $temp_dir -name '*.png')
+echo 'Comparing and pruning...'
+for file in $(find $output_dir/red-blue -name '*.png' -printf '%P\n')
 do
-    common_path=${file##$temp_dir}
-    if cmp -s $file $output_dir/$common_path
+    if cmp -s $output_dir/$file $output_dir/red-blue/$file
     then
-        rm $file
-    else
-        mv $file $output_dir/red-blue/$common_path
+        rm $output_dir/red-blue/$file
     fi
 done
-
-rmdir $temp_dir/right $temp_dir
 
 # Make duplicates for named default forms
 echo 'Copying default forms...'
