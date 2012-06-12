@@ -29,7 +29,9 @@ from sys import argv
 
 import tables
 
-VERSION = None
+SKY = 'sky'
+BLUE = 'blue'
+version = None
 
 def build_filename(pokemon, expression, is_right, output_dir):
     """Determine an output filename for a sprite given the Pokémon it
@@ -147,7 +149,7 @@ def parse_palette(kaomado):
             channel >> 3 for channel in kaomado.read(3)
         ))
 
-        if VERSION == 'blue':
+        if version == BLUE:
             kaomado.seek(1, os.SEEK_CUR)
 
     return palette
@@ -281,10 +283,10 @@ output_dir = argv[2]
 magic = kaomado.read(5)
 
 if magic == b'\x00\x00\x00\x00\x00':
-    VERSION = 'sky'
+    version = SKY
     rip = rip_sky
 elif magic == b'ax001':
-    VERSION = 'blue'
+    version = BLUE
     rip = rip_blue
 else:
     print("Unrecognized portrait file")
@@ -292,7 +294,7 @@ else:
 
 # Make the leaves of the required directory tree (parents are taken care of)
 makedirs_if_need_be(os.path.join(output_dir, 'right'))
-if VERSION == 'sky':
+if version == SKY:
     makedirs_if_need_be(os.path.join(output_dir, 'female', 'right'))
 
 rip(kaomado, output_dir)
